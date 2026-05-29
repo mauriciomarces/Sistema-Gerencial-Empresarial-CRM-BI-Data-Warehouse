@@ -1,0 +1,98 @@
+# ========================================
+# GIT IGNORE - Sistema CRM BI Nestle
+# ========================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+etl/logs/*.log
+scripts/logs/*.log
+
+# Datos sensibles
+.env
+.env.local
+.env.*.local
+credentials.json
+secrets/
+
+# Bases de datos
+*.db
+*.sqlite
+*.sqlite3
+*.backup
+*.bak
+*.dump
+
+# Docker
+.dockerignore
+.docker/
+docker-compose.override.yml
+
+# Archivos temporales
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+
+# Backups
+backup/
+backups/
+*.backup.*
+
+# OS
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Variables de entorno local
+.envrc
+
+# Archivos de prueba
+test_*.py
+*_test.py
+
+# Directorio de configuración local
+local_config/
+
+# Certificados
+*.pem
+*.key
+*.crt
+*.cer
+certs/
+
+# Imágenes/archivos binarios grandes
+*.tar.gz
+*.zip
+*.iso
+
+# No incluir volúmenes de Docker
+volumes/
+data/
+postgres_data/
+sqlserver_data/
+redis_data/
+odoo_data/
+portainer_data/

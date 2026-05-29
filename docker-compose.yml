@@ -1,0 +1,198 @@
+version: "3.9"
+
+services:
+  # ============================================
+  # SQL SERVER - Base de datos empresarial
+  # ============================================
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: crm-sqlserver
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: "NestleAdmin@2024" # Cambiar en producción
+      MSSQL_PID: Express
+      MSSQL_TCP_PORT: 1433
+    ports:
+      - "1433:1433"
+    volumes:
+      # Montar /var/opt/mssql completo (no solo /data): el usuario mssql (uid 10001) necesita permisos en data, log y secrets
+      - sqlserver_data:/var/opt/mssql
+      - ./sql/init:/docker-entrypoint-initdb.d
+    shm_size: "2gb"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          '/opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -Q "SELECT 1" || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - crm_network
+    restart: unless-stopped
+
+  # ============================================
+  # REDIS - Cache y sesiones
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: crm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm_network
+    restart: unless-stopped
+
+  # ============================================
+  # ODOO - ERP/CRM Principal
+  # ============================================
+  odoo:
+    image: odoo:17.0
+    container_name: crm-odoo
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Variables estándar de la imagen oficial odoo:17 (entrypoint → PostgreSQL)
+      HOST: postgres
+      USER: odoo
+      PASSWORD: odoo
+      PORT: 5432
+    ports:
+      - "8069:8069"
+      - "8072:8072"
+    volumes:
+      - odoo_data:/var/lib/odoo
+      - ./odoo/addons:/mnt/extra-addons
+      - ./odoo/config:/etc/odoo
+    command:
+      - odoo
+      - --config=/etc/odoo/odoo.conf
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8069/web/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    networks:
+      - crm_network
+    restart: unless-stopped
+
+  # ============================================
+  # POSTGRES - Base de datos Odoo
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: crm-postgres
+    environment:
+      POSTGRES_DB: odoo_production
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/postgres_init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm_network
+    restart: unless-stopped
+
+  # ============================================
+  # PGADMIN - Gestor PostgreSQL
+  # ============================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: crm-pgadmin
+    depends_on:
+      - postgres
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@nestle.com
+      PGADMIN_DEFAULT_PASSWORD: PGAdmin@2024
+    ports:
+      - "5050:80"
+    networks:
+      - crm_network
+    restart: unless-stopped
+
+  # ============================================
+  # PORTAINER - Gestor de contenedores
+  # ============================================
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: crm-portainer
+    ports:
+      - "9000:9000"
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - crm_network
+    restart: unless-stopped
+    # Se inicia con el stack; start.sh lo reinicia al final para evitar el timeout
+    # de instalación inicial (5 min sin completar el registro de admin).
+
+  # ============================================
+  # ETL SERVICE - Procesamiento de datos
+  # ============================================
+  etl-service:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    container_name: crm-etl
+    depends_on:
+      - odoo
+      - sqlserver
+      - postgres
+    environment:
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: odoo_production
+      ODOO_USER: admin
+      ODOO_PASSWORD: admin
+      SQL_SERVER: sqlserver:1433
+      SQL_USER: sa
+      SQL_PASSWORD: "NestleAdmin@2024"
+      SQL_DB: nestle_dw
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+      POSTGRES_DB: odoo_production
+    volumes:
+      - ./etl/logs:/app/logs
+      - ./etl/scripts:/app/scripts
+    networks:
+      - crm_network
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  odoo_data:
+    driver: local
+  portainer_data:
+    driver: local
+
+networks:
+  crm_network:
+    driver: bridge

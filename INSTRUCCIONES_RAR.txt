@@ -1,0 +1,47 @@
+INSTRUCCIONES RÁPIDAS — Sistema Gerencial Nestlé
+================================================
+
+PARA QUIEN RECIBE EL ARCHIVO .RAR
+---------------------------------
+
+1. Instalar Docker Desktop (https://www.docker.com/products/docker-desktop/)
+2. Reiniciar el PC si es necesario
+3. Descomprimir el RAR en:  C:\sistemas-empresariales
+4. Abrir Docker Desktop → esperar "Engine running"
+5. Abrir PowerShell EN ESA CARPETA y ejecutar:
+
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\start.ps1
+
+6. Esperar 10-20 minutos (primera vez)
+7. Abrir README.md para la guía completa
+
+URLS PRINCIPALES
+----------------
+  Odoo:       http://localhost:8069     (admin / admin)
+  Portainer:  http://localhost:9000     (admin / admin12345678)
+  pgAdmin:    http://localhost:5050     (admin@nestle.com / PGAdmin@2024)
+  SQL Server: 127.0.0.1,1433            (sa / NestleAdmin@2024) → nestle_dw
+
+POWER BI
+--------
+  Servidor: 127.0.0.1,1433
+  Autenticación: SQL Server (NO Windows)
+  Usuario: sa | Contraseña: NestleAdmin@2024
+  Opciones avanzadas: Encrypt=True;TrustServerCertificate=True;Authentication=SqlPassword;
+
+ETL MANUAL (Odoo → SQL Server)
+------------------------------
+  docker compose exec etl-service python etl_nestle.py
+
+SI ALGO FALLA
+-------------
+  Ver README.md sección "Problemas frecuentes"
+  Portainer timeout: docker compose restart portainer
+  Reinicio limpio: docker compose down --volumes && .\start.ps1
+
+PARA QUIEN EMPAQUETA EL RAR
+---------------------------
+  Incluir: todo el proyecto excepto .git, etl/logs/*.log
+  No incluir volúmenes Docker (no están en disco)
+  Adjuntar este archivo + README.md
