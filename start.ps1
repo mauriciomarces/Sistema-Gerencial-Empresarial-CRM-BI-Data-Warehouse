@@ -43,6 +43,9 @@ if (-not (Test-Path "sql/init/01_data_warehouse.sql")) {
 if (-not (Test-Path "sql/init/02_datos_ejemplo.sql")) {
     Copy-Item "sql/02_datos_ejemplo.sql" "sql/init/" -ErrorAction SilentlyContinue
 }
+if (-not (Test-Path "sql/init/03_datawarehouse_v2.sql")) {
+    Copy-Item "sql/03_datawarehouse_v2.sql" "sql/init/" -ErrorAction SilentlyContinue
+}
 Write-Ok "Archivos configurados"
 
 Write-Header "LIMPIEZA DE CONTENEDORES ANTERIORES"
@@ -79,9 +82,9 @@ while ($elapsed -lt $timeout) {
 $odooReady = docker compose exec -T -e PGPASSWORD=odoo postgres psql -U odoo -d odoo_production -tAc `
     "SELECT 1 FROM information_schema.tables WHERE table_name='ir_module_module' LIMIT 1" 2>$null
 if ($odooReady -notmatch "1") {
-    Write-Info "Instalando módulos base de Odoo (puede tardar varios minutos)..."
+    Write-Info "Instalando módulos de Odoo: base, ventas, CRM e inventario (puede tardar varios minutos)..."
     docker compose stop odoo 2>$null
-    docker compose run --rm odoo odoo --config=/etc/odoo/odoo.conf -d odoo_production -i base --stop-after-init --without-demo=all
+    docker compose run --rm odoo odoo --config=/etc/odoo/odoo.conf -d odoo_production -i base,sale_management,crm,stock --workers=0 --stop-after-init --without-demo=all
     docker compose start odoo
     Write-Ok "Base de datos Odoo inicializada"
 }
@@ -99,13 +102,10 @@ while ($elapsed -lt $timeout) {
 
 Write-Header "INICIALIZANDO DATA WAREHOUSE"
 Write-Info "Creando base de datos nestle_dw..."
-docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -Q "CREATE DATABASE nestle_dw" 2>$null
+docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -Q "IF DB_ID(N'nestle_dw') IS NULL CREATE DATABASE nestle_dw" 2>$null
 Start-Sleep -Seconds 3
-Write-Info "Ejecutando scripts SQL..."
-docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -i /docker-entrypoint-initdb.d/01_data_warehouse.sql
-Start-Sleep -Seconds 3
-Write-Info "Insertando datos de ejemplo..."
-docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -i /docker-entrypoint-initdb.d/02_datos_ejemplo.sql
+Write-Info "Ejecutando Data Warehouse v2..."
+docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -i /docker-entrypoint-initdb.d/03_datawarehouse_v2.sql
 Write-Ok "Data Warehouse inicializado"
 
 Write-Info "Reiniciando Portainer..."

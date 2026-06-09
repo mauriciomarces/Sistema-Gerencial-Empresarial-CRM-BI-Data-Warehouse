@@ -12,7 +12,7 @@ El servicio **ETL** (`crm-etl`) extrae datos operativos de **Odoo** y los carga 
 | Script | `etl/etl_nestle.py` |
 | Frecuencia | Cada **1 hora** (automático) + al arrancar el contenedor |
 | Origen | Odoo (XML-RPC) — http://odoo:8069 |
-| Destino | SQL Server — `sqlserver:1433` / BD `nestle_dw` |
+| Destino | SQL Server — `sqlserver,1433` / BD `nestle_dw` |
 | Logs | `etl/logs/etl.log` |
 
 ---
@@ -27,7 +27,7 @@ Definidas en `docker-compose.yml` para el servicio `etl-service`:
 | `ODOO_DB` | `odoo_production` |
 | `ODOO_USER` | `admin` |
 | `ODOO_PASSWORD` | `admin` |
-| `SQL_SERVER` | `sqlserver:1433` |
+| `SQL_SERVER` | `sqlserver,1433` |
 | `SQL_USER` | `sa` |
 | `SQL_PASSWORD` | `NestleAdmin@2024` |
 | `SQL_DB` | `nestle_dw` |

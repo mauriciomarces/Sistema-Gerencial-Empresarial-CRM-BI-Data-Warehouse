@@ -98,6 +98,9 @@ fi
 if [ ! -f "sql/init/02_datos_ejemplo.sql" ]; then
     cp sql/02_datos_ejemplo.sql sql/init/ 2>/dev/null || true
 fi
+if [ ! -f "sql/init/03_datawarehouse_v2.sql" ]; then
+    cp sql/03_datawarehouse_v2.sql sql/init/ 2>/dev/null || true
+fi
 
 print_success "Archivos configurados"
 
@@ -161,9 +164,9 @@ done
 # Inicializar Odoo si la BD existe pero aún no tiene esquema (primera ejecución)
 if ! docker-compose exec -T -e PGPASSWORD=odoo postgres psql -U odoo -d odoo_production -tAc \
     "SELECT 1 FROM information_schema.tables WHERE table_name='ir_module_module' LIMIT 1" 2>/dev/null | grep -q 1; then
-    print_info "Instalando módulos base de Odoo (puede tardar varios minutos)..."
+    print_info "Instalando módulos de Odoo: base, ventas, CRM e inventario (puede tardar varios minutos)..."
     docker-compose stop odoo 2>/dev/null || true
-    docker-compose run --rm odoo odoo --config=/etc/odoo/odoo.conf -d odoo_production -i base --stop-after-init --without-demo=all
+    docker-compose run --rm odoo odoo --config=/etc/odoo/odoo.conf -d odoo_production -i base,sale_management,crm,stock --workers=0 --stop-after-init --without-demo=all
     docker-compose start odoo
     print_success "Base de datos Odoo inicializada"
 fi
@@ -190,18 +193,13 @@ print_header "INICIALIZANDO DATA WAREHOUSE"
 
 # Crear base de datos
 print_info "Creando base de datos nestle_dw..."
-docker-compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -Q "CREATE DATABASE nestle_dw" 2>/dev/null || print_info "Base de datos ya existe"
+docker-compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -Q "IF DB_ID(N'nestle_dw') IS NULL CREATE DATABASE nestle_dw" 2>/dev/null || print_info "Base de datos ya existe"
 
 sleep 5
 
 # Ejecutar scripts
-print_info "Ejecutando scripts SQL..."
-docker-compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -i /docker-entrypoint-initdb.d/01_data_warehouse.sql 2>&1 | tail -5
-
-sleep 5
-
-print_info "Insertando datos de ejemplo..."
-docker-compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -i /docker-entrypoint-initdb.d/02_datos_ejemplo.sql 2>&1 | tail -5
+print_info "Ejecutando Data Warehouse v2..."
+docker-compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P "NestleAdmin@2024" -i /docker-entrypoint-initdb.d/03_datawarehouse_v2.sql 2>&1 | tail -5
 
 print_success "Data Warehouse inicializado"
 

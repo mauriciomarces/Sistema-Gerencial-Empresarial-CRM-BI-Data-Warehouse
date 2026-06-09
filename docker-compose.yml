@@ -9,12 +9,16 @@ services:
     container_name: crm-sqlserver
     environment:
       ACCEPT_EULA: Y
-      SA_PASSWORD: "NestleAdmin@2024" # Cambiar en producción
+      SA_PASSWORD: "NestleAdmin@2024"
       MSSQL_PID: Express
       MSSQL_TCP_PORT: 1433
+      MSSQL_MEMORY_LIMIT_MB: 3072
+      MSSQL_AGENT_ENABLED: 'true'
     ports:
       - "1433:1433"
+
     volumes:
+
       # Montar /var/opt/mssql completo (no solo /data): el usuario mssql (uid 10001) necesita permisos en data, log y secrets
       - sqlserver_data:/var/opt/mssql
       - ./sql/init:/docker-entrypoint-initdb.d
@@ -100,6 +104,7 @@ services:
       POSTGRES_DB: odoo_production
       POSTGRES_USER: odoo
       POSTGRES_PASSWORD: odoo
+
     ports:
       - "5432:5432"
     volumes:
@@ -158,15 +163,19 @@ services:
       dockerfile: Dockerfile
     container_name: crm-etl
     depends_on:
-      - odoo
-      - sqlserver
-      - postgres
+      sqlserver:
+        condition: service_healthy
+      odoo:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
     environment:
       ODOO_URL: http://odoo:8069
       ODOO_DB: odoo_production
       ODOO_USER: admin
       ODOO_PASSWORD: admin
-      SQL_SERVER: sqlserver:1433
+      SQL_SERVER: sqlserver,1433
       SQL_USER: sa
       SQL_PASSWORD: "NestleAdmin@2024"
       SQL_DB: nestle_dw
